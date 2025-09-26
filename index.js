@@ -1,24 +1,26 @@
 import express from "express";
-import bodyParser from "body-parser";
 import cors from "cors";
+import bodyParser from "body-parser";
 import { KJUR } from "jsrsasign";
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const SECRET = "your_super_secret_key";
+const SECRET = "your_super_secret_key"; // フロントと一致させること！
 let savedJWT = null;
 
+// 購入時QR保存
 app.post("/save-purchase", (req, res) => {
   savedJWT = req.body.jwt;
-  console.log("保存されたJWT:", savedJWT);
-  res.json({ message: "保存完了" });
+  console.log("✅ 保存されたJWT:", savedJWT);
+  res.json({ message: "購入QRを保存しました。" });
 });
 
+// 入場時QR照合
 app.post("/verify-entry", (req, res) => {
   const entryJWT = req.body.jwt;
-  if (!savedJWT) return res.json({ message: "購入データが未登録です" });
+  if (!savedJWT) return res.json({ message: "購入データがまだ登録されていません。" });
 
   try {
     const purchasePayload = KJUR.jws.JWS.readSafeJSONString(
@@ -34,15 +36,14 @@ app.post("/verify-entry", (req, res) => {
     ) {
       res.json({ message: "✅ 本人確認OK" });
     } else {
-      res.json({ message: "❌ 情報が一致しません" });
+      res.json({ message: "❌ 一致しません" });
     }
   } catch (e) {
     console.error(e);
-    res.json({ message: "JWT解析エラー" });
+    res.json({ message: "JWTの解析に失敗しました。" });
   }
 });
 
-// Render対応：ポート指定
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
