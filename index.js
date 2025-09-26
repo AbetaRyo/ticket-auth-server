@@ -1,39 +1,51 @@
-const express = require("express");
-const jwt = require("jsonwebtoken");
-const bodyParser = require("body-parser");
+import express from "express";
+import bodyParser from "body-parser";
+import cors from "cors";
+import { KJUR } from "jsrsasign";
 
 const app = express();
+app.use(cors());
 app.use(bodyParser.json());
 
-// 秘密鍵（Renderにデプロイしたら環境変数に切り替える）
-const SECRET = process.env.JWT_SECRET || "mysecretkey";
+const SECRET = "your_super_secret_key";
+let savedJWT = null; // 購入時JWTを一時的に保持（本来はDB）
 
-// チケット購入時 → JWT発行
-app.post("/issue", (req, res) => {
-  const { user_id, name, seat } = req.body;
-
-  const token = jwt.sign(
-    { user_id, name, seat, ticket_source: "purchase" },
-    SECRET,
-    { expiresIn: "1h" }
-  );
-
-  res.json({ token });
+// ✅ チケット購入情報を保存
+app.post("/save-purchase", (req, res) => {
+  savedJWT = req.body.jwt;
+  console.log("保存されたJWT:", savedJWT);
+  res.json({ message: "保存完了" });
 });
 
-// 入場時 → JWT検証
-app.post("/verify", (req, res) => {
-  const { token } = req.body;
+// ✅ 入場時の照合
+app.post("/verify-entry", (req, res) => {
+  const entryJWT = req.body.jwt;
+  if (!savedJWT) return res.json({ message: "購入データが未登録です" });
 
   try {
-    const payload = jwt.verify(token, SECRET);
-    res.json({ valid: true, payload });
-  } catch (err) {
-    res.json({ valid: false, error: err.message });
+    const purchasePayload = KJUR.jws.JWS.readSafeJSONString(
+      Buffer.from(savedJWT.split(".")[1], "base64").toString()
+    );
+    const entryPayload = KJUR.jws.JWS.readSafeJSONString(
+      Buffer.from(entryJWT.split(".")[1], "base64").toString()
+    );
+
+    if (
+      purchasePayload.user_id === entryPayload.user_id &&
+      purchasePayload.device_id === entryPayload.device_id
+    ) {
+      res.json({ message: "✅ 本人確認OK" });
+    } else {
+      res.json({ message: "❌ 情報が一致しません" });
+    }
+  } catch (e) {
+    console.error(e);
+    res.json({ message: "JWT解析エラー" });
   }
 });
 
-const PORT = process.env.PORT || 3000;
+app.listen(3000, () => console.log("🚀 Server running on http://localhost:3000"));
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 app.get("/health", (req, res) => res.send("Server running ✅"));
 
