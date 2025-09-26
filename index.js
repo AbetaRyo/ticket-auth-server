@@ -8,16 +8,14 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const SECRET = "your_super_secret_key";
-let savedJWT = null; // 購入時JWTを一時的に保持（本来はDB）
+let savedJWT = null;
 
-// ✅ チケット購入情報を保存
 app.post("/save-purchase", (req, res) => {
   savedJWT = req.body.jwt;
   console.log("保存されたJWT:", savedJWT);
   res.json({ message: "保存完了" });
 });
 
-// ✅ 入場時の照合
 app.post("/verify-entry", (req, res) => {
   const entryJWT = req.body.jwt;
   if (!savedJWT) return res.json({ message: "購入データが未登録です" });
@@ -44,8 +42,7 @@ app.post("/verify-entry", (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log("🚀 Server running on http://localhost:3000"));
-
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-app.get("/health", (req, res) => res.send("Server running ✅"));
+// Render対応：ポート指定
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
