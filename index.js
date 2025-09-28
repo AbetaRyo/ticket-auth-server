@@ -1,37 +1,41 @@
-const express = require("express");
-const jwt = require("jsonwebtoken");
-const bodyParser = require("body-parser");
+import express from "express";
+import bodyParser from "body-parser";
+import jwt from "jsonwebtoken";
+import cors from "cors";
 
 const app = express();
+app.use(cors());
 app.use(bodyParser.json());
 
-// 秘密鍵（Renderにデプロイしたら環境変数に切り替える）
-const SECRET = process.env.JWT_SECRET || "mysecretkey";
+const SECRET_KEY = "your_super_secret_key"; // JWT生成と同じ秘密鍵を使用
 
-// チケット購入時 → JWT発行
-app.post("/issue", (req, res) => {
-  const { user_id, name, seat } = req.body;
-
-  const token = jwt.sign(
-    { user_id, name, seat, ticket_source: "purchase" },
-    SECRET,
-    { expiresIn: "1h" }
-  );
-
-  res.json({ token });
-});
-
-// 入場時 → JWT検証
+// ✅ JWT署名検証＆一致判定API
 app.post("/verify", (req, res) => {
-  const { token } = req.body;
+  const { jwt1, jwt2 } = req.body;
+  if (!jwt1 || !jwt2) {
+    return res.status(400).json({ error: "JWTが不足しています" });
+  }
 
   try {
-    const payload = jwt.verify(token, SECRET);
-    res.json({ valid: true, payload });
+    const decoded1 = jwt.verify(jwt1, SECRET_KEY);
+    const decoded2 = jwt.verify(jwt2, SECRET_KEY);
+
+    const same_person =
+      decoded1.user_id === decoded2.user_id &&
+      decoded1.device_id === decoded2.device_id &&
+      decoded1.ticket_source === decoded2.ticket_source;
+
+    res.json({
+      valid: true,
+      same_person,
+      payload1: decoded1,
+      payload2: decoded2
+    });
   } catch (err) {
-    res.json({ valid: false, error: err.message });
+    console.error("JWT検証エラー:", err.message);
+    res.json({ valid: false, error: "JWT検証失敗" });
   }
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.get("/health", (req, res) => res.send("Server running ✅"));
